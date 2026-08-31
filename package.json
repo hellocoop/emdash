@@ -1,0 +1,61 @@
+{
+	"name": "@hellocoop/emdash",
+	"version": "0.1.0",
+	"description": "Hellō authentication provider for EmDash CMS — login with Hellō, plus OpenID Provider Commands for account lifecycle",
+	"type": "module",
+	"main": "src/auth.ts",
+	"exports": {
+		".": "./src/auth.ts",
+		"./admin": "./src/admin.tsx",
+		"./routes/*": "./src/routes/*",
+		"./commands/*": "./src/commands/*",
+		"./config": "./src/config.ts",
+		"./storage": "./src/storage.ts"
+	},
+	"files": [
+		"src"
+	],
+	"keywords": [
+		"emdash",
+		"cms",
+		"auth",
+		"hello",
+		"hellocoop",
+		"oidc",
+		"openid",
+		"provider-commands"
+	],
+	"author": {
+		"name": "Hello Identity Co-op",
+		"email": "contact@hello.coop",
+		"url": "https://hello.coop"
+	},
+	"license": "MIT",
+	"homepage": "https://www.hello.dev",
+	"peerDependencies": {
+		"@emdash-cms/auth": ">=0.35.0",
+		"astro": ">=5",
+		"emdash": ">=0.35.0",
+		"react": ">=18"
+	},
+	"dependencies": {
+		"@hellocoop/definitions": "^1.0.13",
+		"@hellocoop/helper-server": "^2.2.5",
+		"jose": "^5.9.6"
+	},
+	"devDependencies": {
+		"@cloudflare/kumo": "^2.6.0",
+		"@emdash-cms/auth": "file:../../emdash-cms/emdash/packages/auth",
+		"@types/react": "^19.0.0",
+		"astro": "^5.0.0",
+		"emdash": "file:../../emdash-cms/emdash/packages/core",
+		"kysely": "^0.29.5",
+		"react": "^19.0.0",
+		"typescript": "^5.7.0",
+		"vitest": "^3.0.0"
+	},
+	"scripts": {
+		"typecheck": "tsc --noEmit",
+		"test": "vitest run"
+	}
+}
