@@ -13,12 +13,14 @@ export const prerender = false;
 
 import { createKyselyAdapter } from "@emdash-cms/auth/adapters/kysely";
 import { getPublicOrigin } from "emdash/api/route-utils";
+import { emit } from "../events.js";
 
 function oauthError(
 	status: number,
 	error: string,
 	error_description?: string,
 ): Response {
+	emit("warn", "hello_command_rejected", error_description ?? error, { status, error });
 	return new Response(
 		JSON.stringify({ error, ...(error_description ? { error_description } : {}) }),
 		{
@@ -92,13 +94,26 @@ export const POST: APIRoute = async ({ request, locals }) => {
 			emdash.db as unknown as Parameters<typeof createKyselyAdapter>[0],
 		);
 
-		return await handleCommand(claims, {
+		const response = await handleCommand(claims, {
 			adapter,
 			accounts: storage.accounts,
 			commandEndpoint,
 			clientId,
 			defaultRole: config.defaultRole,
 		});
+		emit(
+			response.ok ? "info" : "warn",
+			"hello_command",
+			`${claims.command} → ${response.status}`,
+			{
+				command: claims.command,
+				iss: claims.iss,
+				...(claims.tenant ? { tenant: claims.tenant } : {}),
+				...(claims.sub ? { sub: claims.sub } : {}),
+				status: response.status,
+			},
+		);
+		return response;
 	} catch (error) {
 		console.error("[hello-commands] error:", error);
 		return oauthError(500, "server_error");

@@ -32,11 +32,13 @@ import {
 import { createKyselyAdapter } from "@emdash-cms/auth/adapters/kysely";
 import { finalizeSetup, getPublicOrigin, OptionsRepository } from "emdash/api/route-utils";
 import { decodeJwt } from "jose";
+import { emit } from "../events.js";
 
 const STATE_TTL_MS = 10 * 60 * 1000;
 const PROVIDER = "hello";
 
 function loginError(code: string, message: string): string {
+	emit("warn", "hello_login_failed", message, { code });
 	return `/_emdash/admin/login?error=${code}&message=${encodeURIComponent(message)}`;
 }
 
@@ -146,6 +148,11 @@ export const GET: APIRoute = async ({ request, locals, session, redirect }) => {
 					userId: sessionUser.id,
 				});
 			}
+			emit("info", "hello_login", "Hellō account linked to logged-in user", {
+				userId: sessionUser.id,
+				sub,
+				linked: true,
+			});
 			return redirect(stored.returnTo || "/_emdash/admin");
 		}
 
@@ -208,6 +215,11 @@ export const GET: APIRoute = async ({ request, locals, session, redirect }) => {
 			session.set("user", { id: user.id });
 		}
 
+		emit("info", "hello_login", `Hellō login for user ${user.id}`, {
+			userId: user.id,
+			sub,
+			...(isFirstUser ? { firstUser: true } : {}),
+		});
 		return redirect(stored.returnTo || "/_emdash/admin");
 	} catch (callbackError) {
 		console.error("[hello-auth] Callback error:", callbackError);
