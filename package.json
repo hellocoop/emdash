@@ -44,18 +44,18 @@
 	"dependencies": {
 		"@hellocoop/definitions": "^1.0.13",
 		"@hellocoop/helper-server": "^2.2.5",
-		"jose": "^5.9.6"
+		"jose": "^6.2.11"
 	},
 	"devDependencies": {
-		"@cloudflare/kumo": "^2.6.0",
+		"@cloudflare/kumo": "^2.13.1",
 		"@emdash-cms/auth": "file:../../emdash-cms/emdash/packages/auth",
-		"@types/react": "^19.0.0",
-		"astro": "^5.0.0",
+		"@types/react": "^19.2.18",
+		"astro": "^7.3.1",
 		"emdash": "file:../../emdash-cms/emdash/packages/core",
 		"kysely": "^0.29.5",
-		"react": "^19.0.0",
-		"typescript": "^5.7.0",
-		"vitest": "^3.0.0"
+		"react": "^19.2.8",
+		"typescript": "^7.0.2",
+		"vitest": "^5.0.0"
 	},
 	"scripts": {
 		"typecheck": "tsc --noEmit",
