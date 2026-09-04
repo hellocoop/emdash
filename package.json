@@ -32,6 +32,9 @@
 	},
 	"license": "MIT",
 	"homepage": "https://www.hello.dev",
+	"engines": {
+		"node": ">=22.16"
+	},
 	"peerDependencies": {
 		"@emdash-cms/auth": ">=0.35.0",
 		"astro": ">=5",
