@@ -1,16 +1,54 @@
 /**
- * Pluggable deployment events.
+ * Deployment events — emitted by this package, delivered by the deployment.
  *
- * This package EMITS events (logins, OPC commands); the DEPLOYMENT decides
- * where they go by providing the shared virtual module
- * `virtual:emdash-events`, whose exported `onEvent(event)` receives every
- * event. Any integration can provide it — today `aauth()` from
- * @aauth/emdash does, via its `events: "./src/events.ts"` config — and the
- * same sink then receives events from every EmDash library following the
- * convention. No provider in the build → `emit` is a no-op.
+ * This package emits events for logins and OpenID Provider Commands. It does
+ * not decide where they go. The deployment does, once, in its own config, by
+ * way of an integration that owns the sink — today `aauth({ events:
+ * "./src/events.ts" })` from @aauth/emdash. That integration runs a `pre`
+ * middleware which places the deployment's handler on Astro's request
+ * `locals` as `locals.emdashEvents`. Every route in this package already has
+ * `locals`, so emitting is `emit(locals, ...)`. When nothing is registered,
+ * `emit` is a no-op.
  *
- * Resolution is a lazy dynamic import so this file also loads outside the
- * Astro build (unit tests, plain node), where the virtual id cannot resolve.
+ * Why request `locals`, and not something else:
+ *
+ * - Not `hello({ onEvent })` or `hello({ events: "./src/events.ts" })`.
+ *   `hello()` returns an EmDash `AuthProviderDescriptor`, whose `config` must
+ *   be JSON: core serializes it into the bundle and hands it to routes as
+ *   data. A function cannot ride in it, and a module path in it cannot be
+ *   bundled — a dynamic `import(string)` at runtime fails in Workers. Only an
+ *   Astro integration, running at build time, can wire a module in.
+ *
+ * - Not a static `import("virtual:emdash-events")` in this package. That is
+ *   what we had. The virtual module exists only when the integration that
+ *   serves it is in the site's config, and Vite fails the build on any import
+ *   it cannot resolve, try/catch or not. A site that installs `hello()` alone
+ *   could not build. An emitter must never statically import its sink.
+ *
+ * - Not depending on @aauth/emdash, or shipping a factory that returns both a
+ *   descriptor and an integration. A dependency cannot register a Vite plugin;
+ *   only an integration listed in the site's `astro.config` can, and a
+ *   descriptor cannot add one. A factory does not help either: descriptors
+ *   and integrations go in different config arrays, and `emdash()` reads
+ *   `authProviders` when it is constructed, so nothing can inject a descriptor
+ *   later. Either way, the site that adds only the descriptor must still
+ *   build, which brings us back to "never statically import the sink". It
+ *   would also couple Hellō login to AAuth, which is wrong for a site that
+ *   wants one and not the other.
+ *
+ * - Not a `globalThis[Symbol.for("emdash.events")]` registry. It works and is
+ *   the usual cross-package-singleton idiom, but it is ambient, untyped at
+ *   the call site, and invisible in a route's signature. Astro already has
+ *   the mechanism for handing request-scoped services to routes: middleware
+ *   sets `locals`, routes read `locals`, and the shape is declared once by
+ *   merging into `App.Locals` — exactly how EmDash core exposes its own
+ *   handlers as `locals.emdash`. Same mechanism, same typing, no globals, and
+ *   trivially testable with a fake `locals`.
+ *
+ * The long-term home for this is EmDash core (`emdash({ events })` with core
+ * emitting its own login and content events too). Until upstream has it, the
+ * convention is: the integration that owns the sink sets
+ * `locals.emdashEvents`; any library that wants to emit reads it.
  */
 
 export interface EmdashEvent {
@@ -24,47 +62,28 @@ export interface EmdashEvent {
 /** Sync or async; the emitter never awaits it and swallows its errors. */
 export type EmdashEventHandler = (event: EmdashEvent) => unknown;
 
-let handler: EmdashEventHandler | null | undefined;
-let loading: Promise<void> | undefined;
-
-async function resolveHandler(): Promise<void> {
-	try {
-		const mod = (await import("virtual:emdash-events")) as {
-			onEvent?: EmdashEventHandler | null;
-		};
-		handler = mod.onEvent ?? null;
-	} catch {
-		handler = null;
-	}
-}
-
-function deliver(event: EmdashEvent): void {
-	if (!handler) return;
-	try {
-		void handler(event);
-	} catch {
-		/* an event sink must never break the request path */
-	}
+/**
+ * The slice of Astro `locals` this module reads. Declared structurally so
+ * callers can pass real `APIContext["locals"]` or a plain object in tests.
+ */
+export interface EventsLocals {
+	emdashEvents?: EmdashEventHandler | null;
 }
 
 /** Fire-and-forget; never throws, never blocks the request path. */
 export function emit(
+	locals: EventsLocals | undefined,
 	level: EmdashEvent["level"],
 	event: string,
 	message: string,
 	data?: Record<string, unknown>,
 ): void {
+	const handler = locals?.emdashEvents;
+	if (!handler) return;
 	const record: EmdashEvent = { level, event, message, ...(data ? { data } : {}) };
-	if (handler === undefined) {
-		loading ??= resolveHandler();
-		void loading.then(() => deliver(record));
-		return;
+	try {
+		void handler(record);
+	} catch {
+		/* an event sink must never break the request path */
 	}
-	deliver(record);
-}
-
-/** Test seam: install a handler (or null); `undefined` re-arms resolution. */
-export function setEventHandlerForTesting(h: EmdashEventHandler | null | undefined): void {
-	handler = h;
-	loading = undefined;
 }
