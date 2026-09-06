@@ -13,12 +13,15 @@ export const prerender = false;
 
 import { createKyselyAdapter } from "@emdash-cms/auth/adapters/kysely";
 import { getPublicOrigin } from "emdash/api/route-utils";
+import { emit } from "../events.js";
 
 function oauthError(
+	locals: App.Locals,
 	status: number,
 	error: string,
 	error_description?: string,
 ): Response {
+	emit(locals, "warn", "hello_command_rejected", error_description ?? error, { status, error });
 	return new Response(
 		JSON.stringify({ error, ...(error_description ? { error_description } : {}) }),
 		{
@@ -32,7 +35,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
 	const { emdash } = locals;
 
 	if (!emdash?.db) {
-		return oauthError(500, "server_error");
+		return oauthError(locals, 500, "server_error");
 	}
 
 	try {
@@ -42,7 +45,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
 
 		const contentType = request.headers.get("Content-Type") ?? "";
 		if (!contentType.includes("application/x-www-form-urlencoded")) {
-			return oauthError(
+			return oauthError(locals, 
 				400,
 				"invalid_request",
 				"Content-Type must be application/x-www-form-urlencoded",
@@ -51,7 +54,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
 		const form = new URLSearchParams(await request.text());
 		const command_token = form.get("command_token");
 		if (!command_token) {
-			return oauthError(400, "invalid_request", "missing command_token");
+			return oauthError(locals, 400, "invalid_request", "missing command_token");
 		}
 
 		const { resolveHelloConfig } = await import("../config.js");
@@ -64,25 +67,25 @@ export const POST: APIRoute = async ({ request, locals }) => {
 		const emdashLocals = emdash as unknown as Parameters<typeof getHelloStorage>[0];
 		const config = resolveHelloConfig(getHelloProviderConfig(emdashLocals));
 		if (!config.providerCommands) {
-			return oauthError(404, "invalid_request", "provider commands are disabled");
+			return oauthError(locals, 404, "invalid_request", "provider commands are disabled");
 		}
 		const storage = await getHelloStorage(emdashLocals);
 		if (!storage) {
-			return oauthError(500, "server_error");
+			return oauthError(locals, 500, "server_error");
 		}
 
 		const issuers = buildIssuerAllowlist(config.commandIssuers);
 		const result = await verifyCommandToken(command_token, commandEndpoint, issuers);
 		if ("error" in result) {
 			console.error("[hello-commands] invalid command token:", result);
-			return oauthError(result.status, result.error, result.error_description);
+			return oauthError(locals, result.status, result.error, result.error_description);
 		}
 		const { claims } = result;
 
 		// jti replay cache — a command token is single-use
 		const jtiKey = `${claims.iss}|${claims.jti}`;
 		if (await storage.jti.exists(jtiKey)) {
-			return oauthError(400, "invalid_request", "jti already used");
+			return oauthError(locals, 400, "invalid_request", "jti already used");
 		}
 		await storage.jti.put(jtiKey, { exp: claims.exp });
 
@@ -92,15 +95,29 @@ export const POST: APIRoute = async ({ request, locals }) => {
 			emdash.db as unknown as Parameters<typeof createKyselyAdapter>[0],
 		);
 
-		return await handleCommand(claims, {
+		const response = await handleCommand(claims, {
 			adapter,
 			accounts: storage.accounts,
 			commandEndpoint,
 			clientId,
 			defaultRole: config.defaultRole,
 		});
+		emit(
+			locals,
+			response.ok ? "info" : "warn",
+			"hello_command",
+			`${claims.command} → ${response.status}`,
+			{
+				command: claims.command,
+				iss: claims.iss,
+				...(claims.tenant ? { tenant: claims.tenant } : {}),
+				...(claims.sub ? { sub: claims.sub } : {}),
+				status: response.status,
+			},
+		);
+		return response;
 	} catch (error) {
 		console.error("[hello-commands] error:", error);
-		return oauthError(500, "server_error");
+		return oauthError(locals, 500, "server_error");
 	}
 };

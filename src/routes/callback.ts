@@ -32,11 +32,13 @@ import {
 import { createKyselyAdapter } from "@emdash-cms/auth/adapters/kysely";
 import { finalizeSetup, getPublicOrigin, OptionsRepository } from "emdash/api/route-utils";
 import { decodeJwt } from "jose";
+import { emit } from "../events.js";
 
 const STATE_TTL_MS = 10 * 60 * 1000;
 const PROVIDER = "hello";
 
-function loginError(code: string, message: string): string {
+function loginError(locals: App.Locals, code: string, message: string): string {
+	emit(locals, "warn", "hello_login_failed", message, { code });
 	return `/_emdash/admin/login?error=${code}&message=${encodeURIComponent(message)}`;
 }
 
@@ -44,7 +46,7 @@ export const GET: APIRoute = async ({ request, locals, session, redirect }) => {
 	const { emdash } = locals;
 
 	if (!emdash?.db) {
-		return redirect(loginError("server_error", "Database not configured"));
+		return redirect(loginError(locals, "server_error", "Database not configured"));
 	}
 
 	try {
@@ -55,13 +57,13 @@ export const GET: APIRoute = async ({ request, locals, session, redirect }) => {
 		const walletError = url.searchParams.get("error");
 		if (walletError) {
 			const message = url.searchParams.get("error_description") || walletError;
-			return redirect(loginError("hello_denied", message));
+			return redirect(loginError(locals, "hello_denied", message));
 		}
 
 		const code = url.searchParams.get("code");
 		const state = url.searchParams.get("state");
 		if (!code || !state) {
-			return redirect(loginError("hello_error", "Missing code or state"));
+			return redirect(loginError(locals, "hello_error", "Missing code or state"));
 		}
 
 		const { resolveHelloConfig, matchesAllowedEmails } = await import("../config.js");
@@ -73,19 +75,19 @@ export const GET: APIRoute = async ({ request, locals, session, redirect }) => {
 		const config = resolveHelloConfig(getHelloProviderConfig(emdashLocals));
 		const storage = await getHelloStorage(emdashLocals);
 		if (!storage) {
-			return redirect(loginError("server_error", "Hellō provider storage not configured"));
+			return redirect(loginError(locals, "server_error", "Hellō provider storage not configured"));
 		}
 
 		// Single-use state: read then delete before any network calls
 		const stored = await storage.states.get(state);
 		await storage.states.delete(state);
 		if (!stored || Date.now() - stored.createdAt > STATE_TTL_MS) {
-			return redirect(loginError("hello_error", "Login expired — please try again"));
+			return redirect(loginError(locals, "hello_error", "Login expired — please try again"));
 		}
 
 		const clientId = await resolveClientId(config, storage);
 		if (!clientId) {
-			return redirect(loginError("hello_not_configured", "Hellō client_id is not configured"));
+			return redirect(loginError(locals, "hello_not_configured", "Hellō client_id is not configured"));
 		}
 
 		const { fetchToken } = await import("@hellocoop/helper-server");
@@ -99,16 +101,16 @@ export const GET: APIRoute = async ({ request, locals, session, redirect }) => {
 
 		const payload = decodeJwt(idToken);
 		if (payload.iss !== config.issuer) {
-			return redirect(loginError("hello_error", "Unexpected issuer"));
+			return redirect(loginError(locals, "hello_error", "Unexpected issuer"));
 		}
 		if (payload.aud !== clientId) {
-			return redirect(loginError("hello_error", "Unexpected audience"));
+			return redirect(loginError(locals, "hello_error", "Unexpected audience"));
 		}
 		if (payload.nonce !== stored.nonce) {
-			return redirect(loginError("hello_error", "Nonce mismatch"));
+			return redirect(loginError(locals, "hello_error", "Nonce mismatch"));
 		}
 		if (typeof payload.exp !== "number" || payload.exp * 1000 < Date.now()) {
-			return redirect(loginError("hello_error", "Token expired"));
+			return redirect(loginError(locals, "hello_error", "Token expired"));
 		}
 		const sub = payload.sub;
 		const email = typeof payload.email === "string" ? payload.email : undefined;
@@ -116,7 +118,7 @@ export const GET: APIRoute = async ({ request, locals, session, redirect }) => {
 		const name = typeof payload.name === "string" ? payload.name : undefined;
 		const picture = typeof payload.picture === "string" ? payload.picture : undefined;
 		if (!sub || !email) {
-			return redirect(loginError("hello_error", "Missing sub or email claim"));
+			return redirect(loginError(locals, "hello_error", "Missing sub or email claim"));
 		}
 
 		// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- Database uses Generated<> wrappers incompatible with AuthTables structurally; safe at runtime
@@ -127,7 +129,7 @@ export const GET: APIRoute = async ({ request, locals, session, redirect }) => {
 		// OPC tombstone: a deleted account may not sign back in
 		const accountRecord = await storage.accounts.get(sub);
 		if (accountRecord?.state === "deleted") {
-			return redirect(loginError("account_deleted", "This account has been deleted"));
+			return redirect(loginError(locals, "account_deleted", "This account has been deleted"));
 		}
 
 		// Logged-in user linking their Hellō account
@@ -136,7 +138,7 @@ export const GET: APIRoute = async ({ request, locals, session, redirect }) => {
 			const existingLink = await adapter.getOAuthAccount(PROVIDER, sub);
 			if (existingLink && existingLink.userId !== sessionUser.id) {
 				return redirect(
-					loginError("hello_error", "This Hellō account is linked to a different user"),
+					loginError(locals, "hello_error", "This Hellō account is linked to a different user"),
 				);
 			}
 			if (!existingLink) {
@@ -146,6 +148,11 @@ export const GET: APIRoute = async ({ request, locals, session, redirect }) => {
 					userId: sessionUser.id,
 				});
 			}
+			emit(locals, "info", "hello_login", "Hellō account linked to logged-in user", {
+				userId: sessionUser.id,
+				sub,
+				linked: true,
+			});
 			return redirect(stored.returnTo || "/_emdash/admin");
 		}
 
@@ -193,7 +200,7 @@ export const GET: APIRoute = async ({ request, locals, session, redirect }) => {
 		}
 
 		if (user.disabled) {
-			return redirect(loginError("account_disabled", "Account disabled"));
+			return redirect(loginError(locals, "account_disabled", "Account disabled"));
 		}
 
 		// Keep name/email fresh from the wallet on each login
@@ -208,6 +215,11 @@ export const GET: APIRoute = async ({ request, locals, session, redirect }) => {
 			session.set("user", { id: user.id });
 		}
 
+		emit(locals, "info", "hello_login", `Hellō login for user ${user.id}`, {
+			userId: user.id,
+			sub,
+			...(isFirstUser ? { firstUser: true } : {}),
+		});
 		return redirect(stored.returnTo || "/_emdash/admin");
 	} catch (callbackError) {
 		console.error("[hello-auth] Callback error:", callbackError);
@@ -229,6 +241,6 @@ export const GET: APIRoute = async ({ request, locals, session, redirect }) => {
 			}
 		}
 
-		return redirect(loginError(errorCode, message));
+		return redirect(loginError(locals, errorCode, message));
 	}
 };
