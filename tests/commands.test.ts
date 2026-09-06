@@ -1,4 +1,4 @@
-import { exportJWK, generateKeyPair, SignJWT, type KeyLike } from "jose";
+import { exportJWK, generateKeyPair, SignJWT } from "jose";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { handleCommand, type CommandDeps, type CommandUser } from "../src/commands/handler.js";
@@ -8,7 +8,7 @@ import { buildIssuerAllowlist, verifyCommandToken } from "../src/commands/verify
 const ISSUER = "https://issuer.test.example";
 const ENDPOINT = "https://site.example.com/_emdash/api/auth/hello/commands";
 
-let privateKey: KeyLike;
+let privateKey: CryptoKey;
 let issuers: ReturnType<typeof buildIssuerAllowlist>;
 
 beforeAll(async () => {
