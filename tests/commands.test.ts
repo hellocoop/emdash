@@ -8,7 +8,7 @@ import { buildIssuerAllowlist, verifyCommandToken } from "../src/commands/verify
 const ISSUER = "https://issuer.test.example";
 const ENDPOINT = "https://site.example.com/_emdash/api/auth/hello/commands";
 
-let privateKey: CryptoKey;
+let privateKey: Awaited<ReturnType<typeof generateKeyPair>>["privateKey"];
 let issuers: ReturnType<typeof buildIssuerAllowlist>;
 
 beforeAll(async () => {

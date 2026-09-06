@@ -3,17 +3,35 @@
 	"version": "0.1.0",
 	"description": "Hellō authentication provider for EmDash CMS — login with Hellō, plus OpenID Provider Commands for account lifecycle",
 	"type": "module",
-	"main": "src/auth.ts",
+	"main": "./dist/auth.js",
 	"exports": {
-		".": "./src/auth.ts",
-		"./admin": "./src/admin.tsx",
-		"./routes/*": "./src/routes/*",
-		"./commands/*": "./src/commands/*",
-		"./config": "./src/config.ts",
-		"./storage": "./src/storage.ts"
+		".": {
+			"types": "./dist/auth.d.ts",
+			"default": "./dist/auth.js"
+		},
+		"./admin": {
+			"types": "./dist/admin.d.ts",
+			"default": "./dist/admin.js"
+		},
+		"./routes/*": {
+			"types": "./dist/routes/*.d.ts",
+			"default": "./dist/routes/*.js"
+		},
+		"./commands/*": {
+			"types": "./dist/commands/*.d.ts",
+			"default": "./dist/commands/*.js"
+		},
+		"./config": {
+			"types": "./dist/config.d.ts",
+			"default": "./dist/config.js"
+		},
+		"./storage": {
+			"types": "./dist/storage.d.ts",
+			"default": "./dist/storage.js"
+		}
 	},
 	"files": [
-		"src"
+		"dist"
 	],
 	"keywords": [
 		"emdash",
@@ -31,6 +49,13 @@
 		"url": "https://hello.coop"
 	},
 	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/hellocoop/emdash.git"
+	},
+	"bugs": {
+		"url": "https://github.com/hellocoop/emdash/issues"
+	},
 	"homepage": "https://www.hello.dev",
 	"engines": {
 		"node": ">=22.16"
@@ -58,7 +83,10 @@
 		"vitest": "^5.0.0"
 	},
 	"scripts": {
+		"build": "rm -rf dist && tsc -p tsconfig.build.json",
 		"typecheck": "tsc --noEmit",
-		"test": "vitest run"
-	}
+		"test": "vitest run",
+		"prepublishOnly": "npm run build"
+	},
+	"types": "./dist/auth.d.ts"
 }
