@@ -37,22 +37,22 @@ export function hello(config?: HelloAuthConfig): AuthProviderDescriptor {
 		routes: [
 			{
 				pattern: "/_emdash/api/auth/hello/login",
-				entrypoint: "@hellocoop/emdash/routes/login.ts",
+				entrypoint: "@hellocoop/emdash/routes/login",
 			},
 			{
 				pattern: "/_emdash/api/auth/hello/callback",
-				entrypoint: "@hellocoop/emdash/routes/callback.ts",
+				entrypoint: "@hellocoop/emdash/routes/callback",
 			},
 			{
 				pattern: "/_emdash/api/auth/hello/quickstart",
-				entrypoint: "@hellocoop/emdash/routes/quickstart.ts",
+				entrypoint: "@hellocoop/emdash/routes/quickstart",
 			},
 			...(config?.providerCommands === false
 				? []
 				: [
 						{
 							pattern: "/_emdash/api/auth/hello/commands",
-							entrypoint: "@hellocoop/emdash/routes/commands.ts",
+							entrypoint: "@hellocoop/emdash/routes/commands",
 						},
 					]),
 		],
