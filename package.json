@@ -49,6 +49,13 @@
 		"url": "https://hello.coop"
 	},
 	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/hellocoop/emdash.git"
+	},
+	"bugs": {
+		"url": "https://github.com/hellocoop/emdash/issues"
+	},
 	"homepage": "https://www.hello.dev",
 	"engines": {
 		"node": ">=22.16"
