@@ -110,27 +110,26 @@ Publishing runs in GitHub Actions
 authenticates with npm trusted publishing (OIDC). There is no `NPM_TOKEN`
 secret, and nobody publishes from a laptop.
 
-One-time setup on npmjs.com, under the package's **Settings → Trusted
-Publisher**:
+One-time setup, from a maintainer's machine (needs npm 11.5.1+ and answers a
+2FA challenge):
 
-| Field | Value |
-| --- | --- |
-| Publisher | GitHub Actions |
-| Organization or user | `hellocoop` |
-| Repository | `emdash` |
-| Workflow filename | `publish.yml` |
-| Environment | *(leave empty)* |
-| Allowed actions | permit `npm publish`, not only `npm stage publish` |
+```bash
+npm trust github @hellocoop/emdash --repo hellocoop/emdash --file publish.yml --allow-publish
+npm trust list @hellocoop/emdash
+```
 
-Trusted publisher configurations created after 3 September 2026 allow
-`npm stage publish` by default; the workflow runs a direct `npm publish`, so
-direct publishing has to be ticked as well.
+`--file` is the workflow filename alone, and it must match the workflow that
+*starts* the run. `--allow-publish` matters: configurations created after
+3 September 2026 permit only `npm stage publish` by default, and this workflow
+does a direct `npm publish`. The same thing can be set on npmjs.com under the
+package's **Settings → Trusted Publisher**.
 
-**Provenance requires this repository to be public.** npm rejects a publish
+**Provenance requires this repository to be public** — npm rejects a publish
 with `--provenance` from a private source repository (HTTP 422, "Only public
-source repositories are supported when publishing with provenance"). With the
-repository public and a provenance attestation on every version, "Require
-provenance" can be turned on for the package on npmjs.com.
+source repositories are supported when publishing with provenance"). It also
+requires the `repository` field in `package.json` to match where the publish
+comes from. Once every version carries an attestation, "Require provenance"
+can be turned on for the package on npmjs.com.
 
 To cut a release:
 
