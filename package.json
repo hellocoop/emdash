@@ -73,10 +73,10 @@
 	},
 	"devDependencies": {
 		"@cloudflare/kumo": "^2.13.1",
-		"@emdash-cms/auth": "file:../../emdash-cms/emdash/packages/auth",
+		"@emdash-cms/auth": "^0.36.0",
 		"@types/react": "^19.2.18",
 		"astro": "^7.3.1",
-		"emdash": "file:../../emdash-cms/emdash/packages/core",
+		"emdash": "^0.36.0",
 		"kysely": "^0.29.5",
 		"react": "^19.2.8",
 		"typescript": "^6.0.3",
