@@ -1,6 +1,6 @@
 {
 	"name": "@hellocoop/emdash",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"description": "Hellō authentication provider for EmDash CMS — login with Hellō, plus OpenID Provider Commands for account lifecycle",
 	"type": "module",
 	"main": "./dist/auth.js",
